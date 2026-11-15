@@ -1,31 +1,42 @@
-const STORAGE_KEY = 'uniformloop-listings-v1';
-const demoListings = [
-  {id:'ul-101',title:'White school shirt · age 11–12',type:'Uniform',school:'Riverdale Public School',grade:'Grade 6',size:'30',condition:'Like new',sharing:'Free',price:0,owner:'Aarohi',initial:'A',area:'Kothrud',distance:'0.8 km',description:'Worn for one term, freshly washed and in excellent shape. Passing it on because my son has moved up a size.',icon:'👕',tone:'uniform',created:12},
-  {id:'ul-102',title:'Maths textbook · Grade 6',type:'Textbook',school:'Riverdale Public School',grade:'Grade 6',size:'6',condition:'Good',sharing:'Free',price:0,owner:'Meera',initial:'M',area:'Erandwane',distance:'1.2 km',description:'A few notes in pencil on the first pages, all erased. No missing pages. Happy to bundle with the science book.',icon:'📗',tone:'book',created:11},
-  {id:'ul-103',title:'Checked pinafore · size 30',type:'Uniform',school:'Riverdale Public School',grade:'Grade 6',size:'30',condition:'Very good',sharing:'Swap',price:0,owner:'You',initial:'Y',area:'Deccan',distance:'1.4 km',description:'Our daughter has outgrown this pinafore. Looking to swap for size 32, but happy to gift it if it helps another family.',icon:'👗',tone:'uniform',created:10},
-  {id:'ul-104',title:'Sports uniform set · size 32',type:'Sportswear',school:'Greenfield Academy',grade:'Grade 7',size:'32',condition:'Good',sharing:'₹150',price:150,owner:'Kabir',initial:'K',area:'Aundh',distance:'2.1 km',description:'T-shirt and shorts as a set. A small name label inside; otherwise clean and ready for another year.',icon:'🎽',tone:'sports',created:9},
-  {id:'ul-105',title:'Oxford English reader · Grade 5',type:'Textbook',school:'St. Mary’s School',grade:'Grade 5',size:'5',condition:'Like new',sharing:'Free',price:0,owner:'Nisha',initial:'N',area:'Shivajinagar',distance:'2.4 km',description:'Bought new last year and barely used. Keeping the cover on it paid off!',icon:'📘',tone:'book',created:8},
-  {id:'ul-106',title:'Navy blue trousers · size 30',type:'Uniform',school:'Riverdale Public School',grade:'Grade 6',size:'30',condition:'Good',sharing:'Swap',price:0,owner:'Rohan',initial:'R',area:'Karve Nagar',distance:'2.6 km',description:'Two pairs, both in good condition. Would love a size 32 exchange, but a free handoff is fine too.',icon:'👖',tone:'uniform',created:7},
-  {id:'ul-107',title:'Art kit · Grade 4–6',type:'Supplies',school:'Any school',grade:'Grades 4–6',size:'One size',condition:'Very good',sharing:'Free',price:0,owner:'Tara',initial:'T',area:'Model Colony',distance:'2.8 km',description:'Watercolours, ruler, compass and a nearly full sketchbook. Everything works, ready to use.',icon:'🎨',tone:'supplies',created:6},
-  {id:'ul-108',title:'PE track jacket · size 34',type:'Sportswear',school:'Greenfield Academy',grade:'Grade 8',size:'34',condition:'Good',sharing:'₹200',price:200,owner:'Dev',initial:'D',area:'Baner',distance:'3.0 km',description:'Warm track jacket, zipper works perfectly. Small scuff on one sleeve shown in the photo.',icon:'🧥',tone:'sports',created:5},
-  {id:'ul-109',title:'Science workbook · Grade 6',type:'Textbook',school:'Riverdale Public School',grade:'Grade 6',size:'6',condition:'Good',sharing:'Free',price:0,owner:'Ishita',initial:'I',area:'Prabhat Road',distance:'3.2 km',description:'A few completed exercises in pencil, with plenty of room left. Can meet near the school gate.',icon:'📙',tone:'book',created:4},
-  {id:'ul-110',title:'School belt & tie set',type:'Supplies',school:'Riverdale Public School',grade:'Grade 6',size:'One size',condition:'Like new',sharing:'Free',price:0,owner:'You',initial:'Y',area:'Deccan',distance:'1.4 km',description:'Spare belt and tie, both barely used. Add these to your uniform set at no cost.',icon:'🎒',tone:'supplies',created:3}
-];
-
-let listings = loadListings();
+let listings = [];
+let currentUser = null;
+let stats = { listings: 0, free: 0, requests: 0 };
 let activeView = 'browse';
 let sizeOn = false;
 let sortRecent = false;
 let showAll = false;
+let authMode = 'signin';
+let pendingAction = null;
 let toastTimer;
+const savedListings = new Set();
 
-function loadListings(){
-  try { const saved = localStorage.getItem(STORAGE_KEY); if(saved) return JSON.parse(saved); } catch(e) { /* use demo data if local storage is unavailable */ }
-  return demoListings.map(item => ({...item}));
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    credentials: 'same-origin',
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+  });
+  let payload = {};
+  try { payload = await response.json(); } catch { /* handled as an empty response */ }
+  if (!response.ok) throw new Error(payload.error || 'The request could not be completed.');
+  return payload;
 }
-function saveListings(){ try { localStorage.setItem(STORAGE_KEY, JSON.stringify(listings)); } catch(e) { /* the prototype still works for this session */ } }
-function escapeHtml(value){ return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
-function getFilters(){
+
+async function refreshData() {
+  const [me, listingData, nextStats] = await Promise.all([
+    api('/api/me'), api('/api/listings'), api('/api/stats')
+  ]);
+  currentUser = me.user;
+  listings = listingData.listings;
+  stats = nextStats;
+  render();
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+function getFilters() {
   return {
     query: document.getElementById('search-input').value.trim().toLowerCase(),
     school: document.getElementById('school-filter').value,
@@ -34,66 +45,145 @@ function getFilters(){
     size: sizeOn ? '30' : ''
   };
 }
-function score(item){
-  const f=getFilters();let earned=0,total=0;
-  if(f.school!=='all'){total+=50;if(item.school===f.school||item.school==='Any school')earned+=50;}
-  if(f.grade!=='all'){total+=30;const gradeNumber=f.grade.match(/\d+/)?.[0];if(item.grade===f.grade||item.grade==='Any grade'||(gradeNumber&&item.grade.includes(gradeNumber)))earned+=30;}
-  if(f.size){total+=20;if(item.size===f.size||item.size==='One size')earned+=20;}
-  return total?Math.round(earned/total*100):0;
+
+function score(item) {
+  const filters = getFilters();
+  let earned = 0;
+  let possible = 0;
+  if (filters.school !== 'all') { possible += 50; if (item.school === filters.school || item.school === 'Any school') earned += 50; }
+  if (filters.grade !== 'all') {
+    possible += 30;
+    const gradeNumber = filters.grade.match(/\d+/)?.[0];
+    if (item.grade === filters.grade || item.grade === 'Any grade' || (gradeNumber && item.grade.includes(gradeNumber))) earned += 30;
+  }
+  if (filters.size) { possible += 20; if (item.size === filters.size || item.size === 'One size') earned += 20; }
+  return possible ? Math.round(earned / possible * 100) : 0;
 }
-function visibleListings(){
-  const f = getFilters();
-  let items = listings.filter(item => {
-    if(activeView === 'mine' && item.owner !== 'You') return false;
-    if(f.type !== 'all' && item.type !== f.type) return false;
+
+function visibleListings() {
+  const filters = getFilters();
+  const items = listings.filter(item => {
+    if (activeView === 'mine' && !item.isMine) return false;
+    if (filters.type !== 'all' && item.type !== filters.type) return false;
     const haystack = `${item.title} ${item.school} ${item.type} ${item.grade} ${item.area}`.toLowerCase();
-    return !f.query || haystack.includes(f.query);
+    return !filters.query || haystack.includes(filters.query);
   });
-  items.sort(sortRecent ? (a,b) => b.created-a.created : (a,b) => score(b)-score(a));
+  items.sort(sortRecent ? (a, b) => b.created - a.created : (a, b) => score(b) - score(a));
   return items;
 }
-function listingCard(item){
-  const tone = ['uniform','book','sports','supplies'].includes(item.tone) ? item.tone : 'uniform';
+
+function listingCard(item) {
+  const tone = ['uniform', 'book', 'sports', 'supplies'].includes(item.tone) ? item.tone : 'uniform';
   const label = item.condition === 'Like new' ? 'GENTLY LOVED' : item.condition.toUpperCase();
-  const fit=score(item);const match = fit >= 70 ? `<span class="match-pill">${fit}% MATCH</span>` : '';
+  const fit = score(item);
+  const match = fit >= 70 ? `<span class="match-pill">${fit}% MATCH</span>` : '';
+  const saved = savedListings.has(item.id);
+  const requestTag = item.requestSent ? 'REQUEST SENT' : label;
+  const secondary = item.sharing === 'Free' ? 'to a new home' : item.sharing === 'Swap' ? 'open to exchange' : 'for the set';
   return `<article class="item-card">
     <button class="card-click" data-detail="${escapeHtml(item.id)}" aria-label="View ${escapeHtml(item.title)}">
-      <div class="item-visual visual-${tone}"><span class="condition-tag">${item.status==='requested'?'REQUEST SENT':escapeHtml(label)}</span><span class="distance-tag">${escapeHtml(item.distance || 'Nearby')}</span><span class="item-emoji" aria-hidden="true">${escapeHtml(item.icon || '🎒')}</span>${match}</div>
+      <div class="item-visual visual-${tone}"><span class="condition-tag">${escapeHtml(requestTag)}</span><span class="distance-tag">${escapeHtml(item.distance || 'Nearby')}</span><span class="item-emoji" aria-hidden="true">${escapeHtml(item.icon || '🎒')}</span>${match}</div>
       <div class="item-body"><div class="item-category"><span>${escapeHtml(item.type)}</span><span>${escapeHtml(item.grade)}</span></div><h3 class="item-title">${escapeHtml(item.title)}</h3><div class="item-meta">${escapeHtml(item.school)} · ${escapeHtml(item.size === 'One size' ? item.size : `Size ${item.size}`)}</div>
-      <div class="item-footer"><span class="item-owner"><span class="owner-avatar">${escapeHtml(item.initial || item.owner.slice(0,1))}</span>${escapeHtml(item.owner === 'You' ? 'Your listing' : item.owner)} · ${escapeHtml(item.area)}</span><span class="item-price">${escapeHtml(item.sharing)}<small>${item.sharing === 'Free' ? 'to a new home' : item.sharing === 'Swap' ? 'open to exchange' : 'for the set'}</small></span></div></div>
-    </button><button class="item-heart" data-save="${escapeHtml(item.id)}" aria-label="Save ${escapeHtml(item.title)}">♡</button>
+      <div class="item-footer"><span class="item-owner"><span class="owner-avatar">${escapeHtml(item.initial || item.owner.slice(0, 1))}</span>${escapeHtml(item.isMine ? 'Your listing' : item.owner)} · ${escapeHtml(item.area)}</span><span class="item-price">${escapeHtml(item.sharing)}<small>${secondary}</small></span></div></div>
+    </button><button class="item-heart ${saved ? 'saved' : ''}" data-save="${escapeHtml(item.id)}" aria-label="${saved ? 'Unsave' : 'Save'} ${escapeHtml(item.title)}">${saved ? '♥' : '♡'}</button>
   </article>`;
 }
-function render(){
+
+function render() {
   const items = visibleListings();
-  const shown = showAll ? items : items.slice(0,8);
+  const shown = showAll ? items : items.slice(0, 8);
   document.getElementById('listing-grid').innerHTML = shown.map(listingCard).join('');
   document.getElementById('listing-grid').hidden = items.length === 0;
   document.getElementById('no-results').hidden = items.length !== 0;
   document.getElementById('result-count').textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'} nearby`;
   document.getElementById('showing-count').textContent = shown.length;
   document.getElementById('total-count').textContent = items.length;
-  document.getElementById('mine-count').textContent = listings.filter(item => item.owner === 'You').length;
+  document.getElementById('mine-count').textContent = listings.filter(item => item.isMine).length;
   document.getElementById('size-tag').hidden = !sizeOn;
   document.getElementById('filter-size').innerHTML = sizeOn ? 'My size <span>×</span>' : 'My size <span>＋</span>';
   document.getElementById('sort-button').innerHTML = `${sortRecent ? 'Recently added' : 'Best match'} <span>⌄</span>`;
   document.getElementById('load-more').textContent = showAll ? 'Back to top ↑' : 'See all listings →';
+  document.getElementById('stat-items').textContent = stats.listings;
+  document.getElementById('stat-savings').textContent = stats.free;
+  document.getElementById('stat-waste').textContent = stats.requests;
+
   const schools = [...new Set(listings.map(item => item.school).filter(school => school !== 'Any school'))].sort();
   const schoolSelect = document.getElementById('school-filter');
   const chosen = schoolSelect.value;
-  schoolSelect.innerHTML = '<option value="all">All schools</option>' + schools.map(school => `<option value="${escapeHtml(school)}">${escapeHtml(school)}</option>`).join('');
+  schoolSelect.innerHTML = '<option value="all">Any school</option>' + schools.map(school => `<option value="${escapeHtml(school)}">${escapeHtml(school)}</option>`).join('');
   schoolSelect.value = schools.includes(chosen) ? chosen : 'all';
   document.querySelectorAll('.nav-link').forEach(link => link.classList.toggle('active', link.dataset.view === activeView));
-  document.getElementById('section-title').innerHTML = activeView==='mine' ? 'Your items are <em>moving.</em>' : 'Find a <em>close</em> match.';
-  document.getElementById('market-eyebrow').innerHTML = activeView==='mine' ? '<span class="eyebrow-line"></span> YOUR COMMUNITY LISTINGS' : '<span class="eyebrow-line"></span> GOOD THINGS, READY TO GO';
-  const userListings = listings.filter(item => item.owner === 'You').length;
-  document.getElementById('stat-items').textContent = String(128 + Math.max(0,listings.length-demoListings.length)*2);
-  document.getElementById('stat-savings').textContent = `₹${42 + userListings}k`;
+  document.getElementById('section-title').innerHTML = activeView === 'mine' ? 'Your items are <em>moving.</em>' : 'Find a <em>close</em> match.';
+  document.getElementById('market-eyebrow').innerHTML = activeView === 'mine' ? '<span class="eyebrow-line"></span> YOUR COMMUNITY LISTINGS' : '<span class="eyebrow-line"></span> GOOD THINGS, READY TO GO';
+  document.getElementById('auth-button').hidden = !!currentUser;
+  document.getElementById('signed-in-label').hidden = !currentUser;
+  document.getElementById('signed-in-label').textContent = currentUser ? `Hi, ${currentUser.displayName}` : '';
+  document.getElementById('signout-button').hidden = !currentUser;
 }
-function openModal(html){ document.getElementById('modal-content').innerHTML = html; document.getElementById('modal-backdrop').hidden = false; document.body.style.overflow='hidden'; }
-function closeModal(){ document.getElementById('modal-backdrop').hidden = true; document.body.style.overflow=''; }
-function showToast(message){ const toast=document.getElementById('toast'); toast.textContent=message; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove('show'),2700); }
-function addListingModal(){
+
+function openModal(html) {
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-backdrop').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() { document.getElementById('modal-backdrop').hidden = true; document.body.style.overflow = ''; }
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function showAuth(mode = 'signin', note = '') {
+  authMode = mode;
+  const signup = mode === 'signup';
+  openModal(`<div class="eyebrow"><span class="eyebrow-line"></span> YOUR COMMUNITY ACCOUNT</div><h2 id="modal-title">${signup ? 'Join UniformLoop.' : 'Welcome back.'}</h2><p class="modal-lede">${escapeHtml(note || (signup ? 'Create an account to list items and request a handoff.' : 'Sign in to manage your listings and item requests.'))}</p>
+    <div class="auth-tabs"><button type="button" class="auth-tab ${signup ? '' : 'active'}" data-auth-mode="signin">Sign in</button><button type="button" class="auth-tab ${signup ? 'active' : ''}" data-auth-mode="signup">Create account</button></div>
+    <form id="auth-form"><div class="form-grid">
+      ${signup ? '<div class="form-field full"><label for="auth-display-name">Your name</label><input id="auth-display-name" name="displayName" autocomplete="name" required minlength="2" maxlength="40" placeholder="e.g. Asha"></div>' : ''}
+      <div class="form-field full"><label for="auth-username">Username</label><input id="auth-username" name="username" autocomplete="username" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+" placeholder="letters, numbers, underscores"></div>
+      <div class="form-field full"><label for="auth-password">Password</label><input id="auth-password" name="password" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" required minlength="8" maxlength="200" placeholder="At least 8 characters"></div>
+    </div><p class="auth-error" id="auth-error" role="alert"></p><button class="button button-dark modal-submit" id="auth-submit" type="submit">${signup ? 'Create account' : 'Sign in'} <span>↗</span></button><p class="auth-help">Your password is stored as a hash on this server. No email or phone number is collected.</p></form>`);
+  document.querySelectorAll('[data-auth-mode]').forEach(button => button.addEventListener('click', () => showAuth(button.dataset.authMode, note)));
+  document.getElementById('auth-form').addEventListener('submit', submitAuth);
+  document.getElementById('auth-username').focus();
+}
+
+async function submitAuth(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const button = document.getElementById('auth-submit');
+  const errorBox = document.getElementById('auth-error');
+  button.disabled = true;
+  errorBox.textContent = '';
+  try {
+    const path = authMode === 'signup' ? '/api/auth/signup' : '/api/auth/signin';
+    const payload = { username: form.get('username'), password: form.get('password') };
+    if (authMode === 'signup') payload.displayName = form.get('displayName');
+    const result = await api(path, { method: 'POST', body: JSON.stringify(payload) });
+    currentUser = result.user;
+    await refreshData();
+    closeModal();
+    showToast(authMode === 'signup' ? `Welcome, ${currentUser.displayName}!` : `Welcome back, ${currentUser.displayName}.`);
+    const action = pendingAction;
+    pendingAction = null;
+    if (action) action();
+  } catch (error) {
+    errorBox.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+function requireAccount(action, note) {
+  if (currentUser) return false;
+  pendingAction = action;
+  showAuth('signin', note);
+  return true;
+}
+
+function addListingModal() {
+  if (requireAccount(addListingModal, 'Sign in or create an account to list an item.')) return;
   openModal(`<div class="eyebrow"><span class="eyebrow-line"></span> PASS IT FORWARD</div><h2 id="modal-title">List something good.</h2><p class="modal-lede">Add a uniform, book or school essential. A family nearby may be looking for exactly this.</p>
     <form id="listing-form"><div class="form-grid">
       <div class="form-field full"><label for="listing-title">What are you sharing?</label><input id="listing-title" name="title" placeholder="e.g. White school shirt, size 30" required maxlength="70"></div>
@@ -104,41 +194,121 @@ function addListingModal(){
       <div class="form-field"><label for="listing-condition">Condition</label><select id="listing-condition" name="condition"><option>Like new</option><option selected>Very good</option><option>Good</option></select></div>
       <div class="form-field"><label for="listing-sharing">How to pass it on</label><select id="listing-sharing" name="sharing"><option>Free</option><option>Swap</option><option>For sale</option></select></div>
       <div class="form-field full"><label for="listing-description">A little more detail</label><textarea id="listing-description" name="description" placeholder="Size, condition, pickup area, or what you hope to exchange for…" maxlength="220"></textarea></div>
-    </div><p class="form-note">Your exact address is never shown in a public listing.</p><button class="button button-dark modal-submit" type="submit">Add to the community <span>↗</span></button></form>`);
-  document.getElementById('listing-form').addEventListener('submit',submitListing);
-  document.getElementById('listing-sharing').addEventListener('change',event=>{const price=document.getElementById('listing-price-field'); if(price) price.remove(); if(event.target.value==='For sale'){event.target.closest('.form-field').insertAdjacentHTML('afterend','<div class="form-field" id="listing-price-field"><label for="listing-price">Price in ₹</label><input id="listing-price" name="price" type="number" min="1" placeholder="150" required></div>');}});
-}
-function submitListing(event){
-  event.preventDefault(); const data=new FormData(event.currentTarget); const type=data.get('type'); const sharingChoice=data.get('sharing');
-  const item={id:`ul-${Date.now()}`,title:data.get('title').trim(),type,school:data.get('school').trim(),grade:data.get('grade'),size:data.get('size').trim(),condition:data.get('condition'),sharing:sharingChoice==='For sale'?`₹${Number(data.get('price')||0)}`:sharingChoice,price:Number(data.get('price')||0),owner:'You',initial:'Y',area:'Your area',distance:'Nearby',description:data.get('description').trim()||'A useful school essential, ready for another family.',icon:({Uniform:'👕',Textbook:'📗',Sportswear:'🎽',Supplies:'🎒'})[type],tone:({Uniform:'uniform',Textbook:'book',Sportswear:'sports',Supplies:'supplies'})[type],created:Date.now()};
-  listings.unshift(item); saveListings(); closeModal(); activeView='browse'; showAll=true; render(); showToast('Your listing is live. Thanks for passing it on!');
-}
-function showDetails(id){
-  const item=listings.find(entry=>entry.id===id); if(!item)return;
-  const tone=['uniform','book','sports','supplies'].includes(item.tone)?item.tone:'uniform';
-  const isMine=item.owner==='You';
-  openModal(`<div class="detail-visual visual-${tone}"><span>${escapeHtml(item.icon||'🎒')}</span><span class="detail-match">${score(item)>=80?'CLOSE MATCH':'NEARBY FIND'}</span></div><div class="eyebrow"><span class="eyebrow-line"></span>${escapeHtml(item.type)} · ${escapeHtml(item.condition).toUpperCase()}</div><h2 id="modal-title">${escapeHtml(item.title)}</h2><p class="modal-lede">${escapeHtml(item.description)}</p><div class="detail-list"><div><small>School</small><strong>${escapeHtml(item.school)}</strong></div><div><small>Grade</small><strong>${escapeHtml(item.grade)}</strong></div><div><small>Size / class</small><strong>${escapeHtml(item.size)}</strong></div><div><small>Pass it on</small><strong>${escapeHtml(item.sharing)}</strong></div></div><div class="detail-owner"><span class="owner-avatar">${escapeHtml(item.initial||'?')}</span><span><strong>${escapeHtml(item.owner==='You'?'Your listing':item.owner)}</strong><br>${escapeHtml(item.area)} · ${escapeHtml(item.distance||'Nearby')}</span></div><button class="button ${isMine?'button-dark':'button-lime'} modal-submit" id="request-item" ${item.status==='requested'?'disabled':''}>${isMine?'Manage your listing':item.status==='requested'?'Request sent ✓':'Ask about this item'} <span>↗</span></button>`);
-  document.getElementById('request-item').addEventListener('click',()=>{
-    if(isMine){closeModal();activeView='mine';render();showToast('Showing your community listings.');return;}
-    item.status='requested';saveListings();closeModal();render();showToast(`Request noted for ${item.title}. Arrange a safe handoff with the family.`);
+    </div><p class="form-note">Your account name is shown on the listing. Your password and session data are not public.</p><button class="button button-dark modal-submit" type="submit">Add to the community <span>↗</span></button></form>`);
+  document.getElementById('listing-form').addEventListener('submit', submitListing);
+  document.getElementById('listing-sharing').addEventListener('change', event => {
+    const priceField = document.getElementById('listing-price-field');
+    if (priceField) priceField.remove();
+    if (event.target.value === 'For sale') event.target.closest('.form-field').insertAdjacentHTML('afterend', '<div class="form-field" id="listing-price-field"><label for="listing-price">Price in ₹</label><input id="listing-price" name="price" type="number" min="1" placeholder="150" required></div>');
   });
 }
-function setView(view){activeView=view;showAll=view==='mine';document.querySelector('.site-header').classList.remove('menu-open');render();if(view==='impact'){document.querySelector('.proof-strip').scrollIntoView({behavior:'smooth'});showToast('Every handoff keeps useful things in use.');}else{document.getElementById('browse-section').scrollIntoView({behavior:'smooth',block:'start'});}}
 
-document.getElementById('listing-grid').addEventListener('click',event=>{
-  const save=event.target.closest('[data-save]');if(save){event.stopPropagation();save.classList.toggle('saved');save.textContent=save.classList.contains('saved')?'♥':'♡';showToast(save.classList.contains('saved')?'Saved to your shortlist.':'Removed from your shortlist.');return;}
-  const card=event.target.closest('[data-detail]');if(card)showDetails(card.dataset.detail);
+async function submitListing(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const button = event.currentTarget.querySelector('[type=submit]');
+  const sharing = form.get('sharing');
+  const body = {
+    title: String(form.get('title')).trim(), type: form.get('type'), school: String(form.get('school')).trim(),
+    grade: form.get('grade'), size: String(form.get('size')).trim(), condition: form.get('condition'),
+    sharing, price: Number(form.get('price') || 0), description: String(form.get('description') || '').trim()
+  };
+  button.disabled = true;
+  try {
+    await api('/api/listings', { method: 'POST', body: JSON.stringify(body) });
+    await refreshData();
+    closeModal();
+    activeView = 'mine';
+    showAll = true;
+    render();
+    showToast('Your listing is saved for the community.');
+  } catch (error) {
+    button.disabled = false;
+    showToast(error.message);
+  }
+}
+
+function showDetails(id) {
+  const item = listings.find(entry => entry.id === id);
+  if (!item) return;
+  const tone = ['uniform', 'book', 'sports', 'supplies'].includes(item.tone) ? item.tone : 'uniform';
+  const buttonText = item.isMine ? 'Close' : item.requestSent ? 'Request sent ✓' : 'Ask about this item';
+  const buttonClass = item.isMine ? 'button-dark' : 'button-lime';
+  openModal(`<div class="detail-visual visual-${tone}"><span>${escapeHtml(item.icon || '🎒')}</span><span class="detail-match">${score(item) >= 80 ? 'CLOSE MATCH' : 'NEARBY FIND'}</span></div><div class="eyebrow"><span class="eyebrow-line"></span>${escapeHtml(item.type)} · ${escapeHtml(item.condition).toUpperCase()}</div><h2 id="modal-title">${escapeHtml(item.title)}</h2><p class="modal-lede">${escapeHtml(item.description)}</p><div class="detail-list"><div><small>School</small><strong>${escapeHtml(item.school)}</strong></div><div><small>Grade</small><strong>${escapeHtml(item.grade)}</strong></div><div><small>Size / class</small><strong>${escapeHtml(item.size)}</strong></div><div><small>Pass it on</small><strong>${escapeHtml(item.sharing)}</strong></div>${item.isMine ? `<div><small>Requests</small><strong>${item.requestCount || 0}</strong></div>` : ''}</div><div class="detail-owner"><span class="owner-avatar">${escapeHtml(item.initial || '?')}</span><span><strong>${escapeHtml(item.isMine ? 'Your listing' : item.owner)}</strong><br>${escapeHtml(item.area)} · ${escapeHtml(item.distance || 'Nearby')}</span></div><button class="button ${buttonClass} modal-submit" id="request-item" ${item.isMine || item.requestSent ? 'disabled' : ''}>${buttonText} ${item.isMine || item.requestSent ? '' : '<span>↗</span>'}</button>`);
+  document.getElementById('request-item').addEventListener('click', async () => {
+    if (requireAccount(() => showDetails(id), 'Sign in to send a request to this family.')) return;
+    const button = document.getElementById('request-item');
+    button.disabled = true;
+    try {
+      await api(`/api/listings/${encodeURIComponent(id)}/request`, { method: 'POST', body: '{}' });
+      await refreshData();
+      closeModal();
+      showToast('Request saved. The listing owner can see it in their listing details.');
+    } catch (error) {
+      button.disabled = false;
+      showToast(error.message);
+    }
+  });
+}
+
+async function signOut() {
+  try {
+    await api('/api/auth/signout', { method: 'POST', body: '{}' });
+    currentUser = null;
+    activeView = 'browse';
+    await refreshData();
+    showToast('You have signed out.');
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function setView(view) {
+  if (view === 'mine' && requireAccount(() => setView('mine'), 'Sign in to see and manage your listings.')) return;
+  activeView = view;
+  showAll = view === 'mine';
+  document.querySelector('.site-header').classList.remove('menu-open');
+  render();
+  if (view === 'impact') {
+    document.querySelector('.proof-strip').scrollIntoView({ behavior: 'smooth' });
+    showToast('These counts come from saved community listings and requests.');
+  } else {
+    document.getElementById('browse-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+document.getElementById('listing-grid').addEventListener('click', event => {
+  const save = event.target.closest('[data-save]');
+  if (save) {
+    event.stopPropagation();
+    if (savedListings.has(save.dataset.save)) savedListings.delete(save.dataset.save); else savedListings.add(save.dataset.save);
+    render();
+    showToast(savedListings.has(save.dataset.save) ? 'Saved to your shortlist.' : 'Removed from your shortlist.');
+    return;
+  }
+  const card = event.target.closest('[data-detail]');
+  if (card) showDetails(card.dataset.detail);
 });
-document.querySelectorAll('.nav-link').forEach(link=>link.addEventListener('click',()=>setView(link.dataset.view)));
-document.querySelectorAll('[data-scroll-browse]').forEach(button=>button.addEventListener('click',()=>document.getElementById('browse-section').scrollIntoView({behavior:'smooth'})));
-['search-input','school-filter','grade-filter','type-filter'].forEach(id=>document.getElementById(id).addEventListener(id==='search-input'?'input':'change',()=>{showAll=false;render();}));
-document.getElementById('filter-size').addEventListener('click',()=>{sizeOn=!sizeOn;showAll=false;render();});
-document.querySelector('#size-tag button').addEventListener('click',()=>{sizeOn=false;render();});
-document.getElementById('sort-button').addEventListener('click',()=>{sortRecent=!sortRecent;render();});
-document.getElementById('load-more').addEventListener('click',()=>{if(showAll){showAll=false;document.getElementById('browse-section').scrollIntoView({behavior:'smooth'});}else showAll=true;render();});
-['add-listing-top','empty-add','community-list'].forEach(id=>document.getElementById(id).addEventListener('click',addListingModal));
-document.getElementById('modal-close').addEventListener('click',closeModal);
-document.getElementById('modal-backdrop').addEventListener('click',event=>{if(event.target.id==='modal-backdrop')closeModal();});
-document.addEventListener('keydown',event=>{if(event.key==='Escape')closeModal();if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();document.getElementById('search-input').focus();}});
-document.getElementById('mobile-menu').addEventListener('click',()=>document.querySelector('.site-header').classList.toggle('menu-open'));
-render();
+
+document.querySelectorAll('.nav-link').forEach(link => link.addEventListener('click', () => setView(link.dataset.view)));
+document.querySelectorAll('[data-scroll-browse]').forEach(button => button.addEventListener('click', () => document.getElementById('browse-section').scrollIntoView({ behavior: 'smooth' })));
+['search-input', 'school-filter', 'grade-filter', 'type-filter'].forEach(id => document.getElementById(id).addEventListener(id === 'search-input' ? 'input' : 'change', () => { showAll = false; render(); }));
+document.getElementById('filter-size').addEventListener('click', () => { sizeOn = !sizeOn; showAll = false; render(); });
+document.querySelector('#size-tag button').addEventListener('click', () => { sizeOn = false; render(); });
+document.getElementById('sort-button').addEventListener('click', () => { sortRecent = !sortRecent; render(); });
+document.getElementById('load-more').addEventListener('click', () => { if (showAll) { showAll = false; document.getElementById('browse-section').scrollIntoView({ behavior: 'smooth' }); } else showAll = true; render(); });
+['add-listing-top', 'empty-add', 'community-list'].forEach(id => document.getElementById(id).addEventListener('click', addListingModal));
+document.getElementById('auth-button').addEventListener('click', () => showAuth('signin'));
+document.getElementById('signout-button').addEventListener('click', signOut);
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-backdrop').addEventListener('click', event => { if (event.target.id === 'modal-backdrop') closeModal(); });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeModal();
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); document.getElementById('search-input').focus(); }
+});
+document.getElementById('mobile-menu').addEventListener('click', () => document.querySelector('.site-header').classList.toggle('menu-open'));
+
+refreshData().catch(error => {
+  render();
+  showToast(`Start the backend with npm start. ${error.message}`);
+});

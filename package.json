@@ -1,0 +1,9 @@
+{
+  "name": "uniformloop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A community marketplace for passing school essentials on to another family.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

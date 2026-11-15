@@ -1,0 +1,10 @@
+.button-quiet{background:transparent;border:1px solid #dfe4db;color:var(--ink)}
+.button-quiet:hover{background:#edf0e8}
+.signed-in-label{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700;color:#627268}
+.auth-tabs{display:flex;gap:8px;margin:18px 0 15px;border-bottom:1px solid var(--line)}
+.auth-tab{padding:9px 12px;border:0;border-bottom:2px solid transparent;background:none;color:#849087;font-weight:600;font-size:11px}
+.auth-tab.active{color:var(--ink);border-color:var(--ink)}
+.auth-error{min-height:16px;color:#b35045;font-size:10px;margin:8px 0 0}
+.auth-help{margin-top:13px;text-align:center;color:#87928a;font-size:10px;line-height:1.5}
+.form-field input[autocomplete]{font-size:13px}
+@media(max-width:720px){.header-actions #auth-button,.header-actions #signout-button{display:inline-flex}.header-actions #add-listing-top{display:none}.header-actions{gap:6px}.signed-in-label{max-width:74px;font-size:9px}}

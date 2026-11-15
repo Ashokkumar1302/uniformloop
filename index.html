@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="auth.css">
   <style>@media(max-width:720px){.site-header{position:relative}.site-header.menu-open .main-nav{display:flex;position:absolute;top:68px;left:0;right:0;z-index:10;height:auto;background:var(--white);padding:12px 5%;box-shadow:var(--shadow);justify-content:space-around}.site-header.menu-open .nav-link{height:40px}}</style>
 </head>
 <body>
@@ -24,6 +25,9 @@
     </nav>
     <div class="header-actions">
       <span class="location-chip"><span class="location-dot"></span> Pune · 3 km</span>
+      <button class="button button-quiet button-small" id="auth-button">Sign in</button>
+      <span class="signed-in-label" id="signed-in-label" hidden></span>
+      <button class="button button-quiet button-small" id="signout-button" hidden>Sign out</button>
       <button class="button button-dark button-small" id="add-listing-top"><span class="plus">＋</span> List an item</button>
     </div>
     <button class="mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button>
@@ -54,11 +58,11 @@
     </section>
 
     <section class="proof-strip" aria-label="Community impact">
-      <div class="proof-intro">Community snapshot<br><span class="snapshot-note">sample demo data</span></div>
-      <div class="proof-stat"><strong id="stat-items">128</strong><span>items passed on<br>this term</span></div>
-      <div class="proof-stat"><strong id="stat-savings">₹42k</strong><span>kept in family<br>pockets</span></div>
-      <div class="proof-stat"><strong id="stat-waste">96<span class="stat-unit">kg</span></strong><span>of useful things<br>kept in use*</span></div>
-      <div class="proof-foot">Sample figures for this prototype preview.</div>
+      <div class="proof-intro">Community snapshot<br><span class="snapshot-note">live from the server</span></div>
+      <div class="proof-stat"><strong id="stat-items">0</strong><span>active<br>listings</span></div>
+      <div class="proof-stat"><strong id="stat-savings">0</strong><span>free to<br>share</span></div>
+      <div class="proof-stat"><strong id="stat-waste">0</strong><span>requests<br>sent</span></div>
+      <div class="proof-foot">Counts update from shared community data.</div>
     </section>
 
     <section class="market-section" id="browse-section">
