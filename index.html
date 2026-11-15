@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f4ee">
+  <title>UniformLoop — Pass it on</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>@media(max-width:720px){.site-header{position:relative}.site-header.menu-open .main-nav{display:flex;position:absolute;top:68px;left:0;right:0;z-index:10;height:auto;background:var(--white);padding:12px 5%;box-shadow:var(--shadow);justify-content:space-around}.site-header.menu-open .nav-link{height:40px}}</style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#browse" aria-label="UniformLoop home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
+      <span>uniform<span class="brand-light">loop</span></span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <button class="nav-link active" data-view="browse">Browse</button>
+      <button class="nav-link" data-view="mine">My listings <span id="mine-count" class="nav-count">0</span></button>
+      <button class="nav-link" data-view="impact">Our impact</button>
+    </nav>
+    <div class="header-actions">
+      <span class="location-chip"><span class="location-dot"></span> Pune · 3 km</span>
+      <button class="button button-dark button-small" id="add-listing-top"><span class="plus">＋</span> List an item</button>
+    </div>
+    <button class="mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button>
+  </header>
+
+  <main>
+    <section class="hero" id="hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-line"></span> THE SCHOOL CIRCULAR</div>
+        <h1>Good uniforms<br>deserve <em>another</em><br>school year.</h1>
+        <p class="hero-description">A simpler way for families to pass on uniforms, books and school essentials to someone who needs them next.</p>
+        <div class="hero-actions">
+          <button class="button button-lime" data-scroll-browse>Find your next-year kit <span>↗</span></button>
+          <span class="trust-note"><span class="avatar-stack"><b>A</b><b>M</b><b>S</b></span> Shared by families nearby</span>
+        </div>
+      </div>
+      <div class="hero-art" aria-label="Illustration of a school uniform and books ready to be passed on">
+        <div class="art-sticker sticker-top">PASS IT ON <span>↗</span></div>
+        <div class="sun-shape"></div>
+        <div class="uniform-shirt"><div class="shirt-collar"></div><div class="shirt-pocket">U</div><div class="shirt-seam"></div></div>
+        <div class="uniform-skirt"></div>
+        <div class="book book-one"><span>THE<br>WORLD<br>AROUND US</span></div>
+        <div class="book book-two"><span>MATHEMATICS<br><small>GRADE 6</small></span></div>
+        <div class="art-sticker sticker-bottom"><strong>₹0</strong><span>to list<br>and share</span></div>
+        <div class="art-caption"><span class="caption-dot"></span> A little less waste. A lot more good.</div>
+      </div>
+      <div class="hero-footnote"><span>01</span><span class="footnote-rule"></span><span>PRE-LOVED · READY FOR WHAT'S NEXT</span></div>
+    </section>
+
+    <section class="proof-strip" aria-label="Community impact">
+      <div class="proof-intro">Community snapshot<br><span class="snapshot-note">sample demo data</span></div>
+      <div class="proof-stat"><strong id="stat-items">128</strong><span>items passed on<br>this term</span></div>
+      <div class="proof-stat"><strong id="stat-savings">₹42k</strong><span>kept in family<br>pockets</span></div>
+      <div class="proof-stat"><strong id="stat-waste">96<span class="stat-unit">kg</span></strong><span>of useful things<br>kept in use*</span></div>
+      <div class="proof-foot">Sample figures for this prototype preview.</div>
+    </section>
+
+    <section class="market-section" id="browse-section">
+      <div class="section-heading">
+        <div><div class="eyebrow" id="market-eyebrow"><span class="eyebrow-line"></span> GOOD THINGS, READY TO GO</div><h2 id="section-title">Find a <em>close</em> match.</h2></div>
+        <div class="heading-side"><span class="live-dot"></span> <span id="result-count">0 items nearby</span><span class="heading-divider"></span><span>All listings are from local families</span></div>
+      </div>
+
+      <div class="filter-row">
+        <label class="search-field"><span class="search-icon">⌕</span><input id="search-input" type="search" placeholder="Search uniform, book, or school…" autocomplete="off"><kbd>⌘ K</kbd></label>
+        <label class="select-wrap"><span>Match school</span><select id="school-filter"><option value="all">Any school</option></select><b>⌄</b></label>
+        <label class="select-wrap"><span>Match grade</span><select id="grade-filter"><option value="all">Any grade</option><option>Grade 4</option><option>Grade 5</option><option>Grade 6</option><option>Grade 7</option><option>Grade 8</option></select><b>⌄</b></label>
+        <label class="select-wrap"><span>Item</span><select id="type-filter"><option value="all">Everything</option><option value="Uniform">Uniforms</option><option value="Textbook">Textbooks</option><option value="Sportswear">Sportswear</option><option value="Supplies">Supplies</option></select><b>⌄</b></label>
+        <button class="filter-button" id="filter-size">My size <span>＋</span></button>
+        <button class="view-toggle active" aria-label="Grid view">▦</button>
+      </div>
+
+      <div class="active-filter-row"><span class="results-label">COMMUNITY PICKS</span><span class="filter-tag" id="size-tag" hidden>Size 30 <button aria-label="Remove size filter">×</button></span><span class="results-sort">Sort by <button id="sort-button">Best match <span>⌄</span></button></span></div>
+      <div class="listing-grid" id="listing-grid" aria-live="polite"></div>
+      <div class="no-results" id="no-results" hidden><div class="empty-icon">↗</div><h3>No close matches yet</h3><p>Try another school or search, or list what you have to share.</p><button class="button button-dark" id="empty-add">List an item</button></div>
+      <div class="browse-footer"><span>Showing <strong id="showing-count">0</strong> of <strong id="total-count">0</strong> local finds</span><button class="text-button" id="load-more">See all listings <span>→</span></button></div>
+    </section>
+
+    <section class="how-section">
+      <div class="how-intro"><div class="eyebrow"><span class="eyebrow-line"></span> SIMPLE AS PASSING IT ON</div><h2>Good things<br>keep <em>going.</em></h2><p>One family has outgrown it. Another is getting ready for the year ahead. We help them meet in the middle.</p></div>
+      <div class="how-steps"><article><span class="step-number">01</span><div class="step-icon">＋</div><h3>List what you have</h3><p>Uniforms, books and essentials in good condition. Listing takes a minute.</p></article><article><span class="step-number">02</span><div class="step-icon step-icon-match">✳</div><h3>Find your close match</h3><p>We bring the right school, grade and size together. No endless scrolling.</p></article><article><span class="step-number">03</span><div class="step-icon step-icon-pass">↗</div><h3>Arrange a handoff</h3><p>Connect with a nearby family and agree on a simple, safe pickup.</p></article></div>
+    </section>
+
+    <section class="community-cta"><div class="cta-mark"><span></span><span></span></div><div><div class="eyebrow">A SMALL SHARE GOES A LONG WAY</div><h2>Someone nearby is<br>looking for what you have.</h2></div><button class="button button-lime" id="community-list">Share something <span>↗</span></button><div class="cta-decoration">↗</div></section>
+  </main>
+
+  <footer class="site-footer"><a class="brand footer-brand" href="#browse"><span class="brand-mark"><i></i><i></i></span><span>uniform<span class="brand-light">loop</span></span></a><span>School things should have more than one school year.</span><span class="footer-right">MADE FOR THE NEXT FAMILY <span>✳</span></span></footer>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close" id="modal-close" aria-label="Close dialog">×</button><div id="modal-content"></div></section>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
